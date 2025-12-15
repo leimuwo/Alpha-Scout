@@ -1,8 +1,10 @@
 from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode, tools_condition
-from openai import ChatOpenAI
+import os
+from dotenv import load_dotenv
 from core.agent_state import AgentState
 from core.prompt_templates import SYSTEM_PROMPT
+from langchain_openai import ChatOpenAI
 
 # 导入工具
 from tools.real_time_tool import get_stock_price
@@ -13,8 +15,23 @@ from tools.visualization_tool import plot_stock_history
 # 1. 准备工具列表
 tools = [get_stock_price, analyze_sentiment, query_financial_reports, plot_stock_history]
 
+
+# 加载环境变量
+load_dotenv()
+
+api_key = os.getenv("api_key")
+api_base = os.getenv("api_base")
+
 # 2. 初始化 LLM 并绑定工具
-llm = ChatOpenAI(model="gpt-4o", temperature=0)
+# 使用langchain的ChatOpenAI来处理工具调用
+llm = ChatOpenAI(
+    model="deepseek-chat",
+    temperature=0,
+    openai_api_key=api_key,
+    openai_api_base=api_base
+)
+
+# 将工具绑定到LLM
 llm_with_tools = llm.bind_tools(tools)
 
 # 3. 定义节点函数
@@ -29,7 +46,7 @@ def agent_node(state: AgentState):
     return {"messages": [response]}
 
 # 4. 构建 Graph
-workflow = StateGraph(AgentState)
+workflow = StateGraph[AgentState, None, AgentState, AgentState](AgentState)
 
 # 添加节点
 workflow.add_node("agent", agent_node)

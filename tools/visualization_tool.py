@@ -1,4 +1,7 @@
 import yfinance as yf
+import matplotlib
+# 使用非交互式后端，避免Tkinter相关错误
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from langchain_core.tools import tool
 from utils.error_handlers import tool_error_handler

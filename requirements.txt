@@ -1,0 +1,11 @@
+langgraph
+openai
+python-dotenv
+langchain-core
+langchain-openai
+langchain-community
+tushare
+akshare
+pandas
+yfinance
+matplotlib
