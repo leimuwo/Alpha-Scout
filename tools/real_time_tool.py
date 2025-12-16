@@ -244,20 +244,32 @@ def get_stock_price(ticker: str, market: str = None):
     """
     print(f"🔧 Tool: Fetching data for {ticker}...")
     
+    # Create cache directory
+    cache_dir = "data_source/stock_cache"
+    os.makedirs(cache_dir, exist_ok=True)
+    
+    result = None
     # 根据市场参数或股票代码后缀自动选择数据源
     if market == 'cn' or (market is None and any(ticker.endswith(suffix) for suffix in ['SH', 'SZ', 'BJ'])):
-        # 中国市场股票，先尝试tushare，如果失败则使用akshare
         try:
-            return get_tushare_stock_data(ticker)
+            result = get_tushare_stock_data(ticker)
         except Exception as e:
             print(f"🔄 Tushare获取失败，尝试使用Akshare: {e}")
-            return get_akshare_stock_data(ticker)
+            result = get_akshare_stock_data(ticker)
     elif market == 'us' or (market is None and not any(ticker.endswith(suffix) for suffix in ['SH', 'SZ', 'BJ'])):
-        # 美国市场股票，使用yfinance
-        return get_yfinance_stock_data(ticker)
+        result = get_yfinance_stock_data(ticker)
     else:
-        # 默认使用yfinance
-        return get_yfinance_stock_data(ticker)
+        result = get_yfinance_stock_data(ticker)
+        
+    # Save to local cache
+    if result:
+        hist, fundamentals = result
+        if not hist.empty:
+            cache_path = os.path.join(cache_dir, f"{ticker}.csv")
+            hist.to_csv(cache_path)
+            print(f"💾 Data cached to {cache_path}")
+            
+    return result
 
 if __name__ == "__main__":
     # 测试用例

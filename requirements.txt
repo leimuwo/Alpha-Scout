@@ -9,3 +9,7 @@ akshare
 pandas
 yfinance
 matplotlib
+pypdf
+chromadb
+sentence-transformers
+langchain-huggingface

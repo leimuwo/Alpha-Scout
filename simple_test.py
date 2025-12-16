@@ -11,7 +11,7 @@ def simple_test():
     print("简单测试Agent Graph功能...")
     
     # 使用预设的用户问题
-    user_input = "分析苹果公司(AAPL)的股票情况"
+    user_input = "帮我分析一下A股里邮储银行的股票情况"
     print(f"\n用户问题: {user_input}")
     
     # 创建初始状态

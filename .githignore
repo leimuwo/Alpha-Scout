@@ -1,2 +1,6 @@
 ./test/
 */__pycache__/
+test*
+data_source/rag_data/*
+data_source/vector_db/*
+data_source/stock_cache/*

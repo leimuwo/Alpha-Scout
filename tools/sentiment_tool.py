@@ -1,8 +1,19 @@
 from langchain_core.tools import tool
 from utils.error_handlers import tool_error_handler
 import os
+import akshare as ak
+import yfinance as yf
+from langchain_openai import ChatOpenAI
+from langchain_core.messages import HumanMessage, SystemMessage
+import json
+import datetime
+from dotenv import load_dotenv
 
-proxy = 'http://127.0.0.1:7897' # 代理设置，与其他工具保持一致
+# Load environment variables
+load_dotenv()
+
+# Proxy settings (consistent with other tools)
+proxy = 'http://127.0.0.1:7897'
 os.environ['HTTP_PROXY'] = proxy
 os.environ['HTTPS_PROXY'] = proxy
 
@@ -10,73 +21,154 @@ os.environ['HTTPS_PROXY'] = proxy
 @tool_error_handler
 def analyze_sentiment(ticker: str):
     """
-    分析股票的市场情感（通过新闻、社交媒体等）
-    返回正面、负面和中性情感的分布情况
+    Analyzes market sentiment for a given stock ticker by fetching latest news 
+    and using an LLM to evaluate sentiment.
+    Supports A-shares (via AkShare) and US shares (via yfinance).
     """
     print(f"🔧 Tool: Analyzing sentiment for {ticker}...")
     
-    # 由于是示例，这里使用一个模拟的情感分析函数
-    # 实际应用中可以使用NewsAPI、Twitter API或其他情感分析服务
+    news_items = []
+    stock_name = ticker
     
-    # 增强的模拟情感数据，包含详细新闻摘要
-    sentiment_data = {
-        "ticker": ticker,
-        "sentiment_score": 0.75,  # 0-1之间的分数，越高越正面
-        "sentiment_distribution": {
-            "positive": 0.6,
-            "neutral": 0.3,
-            "negative": 0.1
-        },
-        "news_analysis": {
-            "total_news_analyzed": 25,
-            "time_range": "过去7天",
-            "top_news": [
-                {
-                    "title": f"{ticker}公布了超出预期的季度财报",
-                    "summary": f"{ticker}今天公布了2024财年Q2季度财报，营收达到1200亿美元，同比增长8%，超出市场预期的1150亿美元。净利润为320亿美元，同比增长10%。",
-                    "source": "财经新闻网",
-                    "publish_time": "2024-01-25 08:30:00",
-                    "sentiment": "positive",
-                    "sentiment_score": 0.9
-                },
-                {
-                    "title": "分析师上调了对苹果的目标价",
-                    "summary": "摩根士丹利分析师将苹果目标价从280美元上调至300美元，维持'增持'评级。分析师认为苹果的AI战略将成为未来增长的主要驱动力。",
-                    "source": "华尔街日报",
-                    "publish_time": "2024-01-24 14:45:00",
-                    "sentiment": "positive",
-                    "sentiment_score": 0.85
-                },
-                {
-                    "title": f"{ticker}推出了新产品线",
-                    "summary": f"在今天的产品发布会上，{ticker}推出了全新的MacBook Pro系列和升级版的iPad Pro，搭载了最新的M3芯片。市场反响热烈，股价上涨2%。",
-                    "source": "科技评论",
-                    "publish_time": "2024-01-23 10:00:00",
-                    "sentiment": "positive",
-                    "sentiment_score": 0.8
-                },
-                {
-                    "title": f"{ticker}在中国市场面临竞争压力",
-                    "summary": f"最新数据显示，{ticker}在中国智能手机市场的份额从去年的18%下降到15%，面临来自本土品牌的激烈竞争。",
-                    "source": "市场研究机构",
-                    "publish_time": "2024-01-22 09:15:00",
-                    "sentiment": "negative",
-                    "sentiment_score": 0.3
-                }
-            ]
-        },
-        "key_sentiment_drivers": [
-            "强劲的财报表现",
-            "积极的分析师评级",
-            "新产品发布",
-            "国际市场竞争压力"
-        ]
-    }
+    # 1. Fetch News
+    try:
+        # Detect market type roughly
+        is_a_share = any(ticker.endswith(suffix) for suffix in ['.SH', '.SZ', '.BJ']) or (ticker.isdigit() and len(ticker) == 6)
+        
+        if is_a_share:
+            # A-Share: AkShare
+            # Clean ticker for AkShare (e.g. 600519.SH -> 600519)
+            code = ticker.split('.')[0]
+            print(f"Fetching A-share news for {code}...")
+            
+            try:
+                # Primary source: EastMoney specific stock news
+                news_df = ak.stock_news_em(symbol=code)
+                # Take top 10 latest news
+                if not news_df.empty:
+                    recent_news = news_df.head(10)
+                    for _, row in recent_news.iterrows():
+                        news_items.append({
+                            "title": row.get('title', ''),
+                            "summary": row.get('content', '')[:200] + "...", # Truncate content
+                            "publish_time": row.get('public_time', ''),
+                            "source": "EastMoney"
+                        })
+            except Exception as e:
+                print(f"Warning: Primary news source failed ({e}). Trying fallback (Cailianshe)...")
+                # Fallback: Cailianshe Global Rolling News filtered by stock code/name
+                try:
+                    news_df = ak.stock_info_global_cls()
+                    # Filter for code or name (if we had name, but code is safer alias)
+                    # We don't have name easily here without another call, so just filter by code or simple heuristic
+                    mask = news_df['内容'].str.contains(code) | news_df['标题'].str.contains(code)
+                    # If we could get stock name that would be better. 
+                    # Let's try to search fast.
+                    filtered_news = news_df[mask]
+                    
+                    if not filtered_news.empty:
+                        for _, row in filtered_news.head(5).iterrows():
+                            news_items.append({
+                                "title": row.get('标题', ''),
+                                "summary": row.get('内容', '')[:200] + "...",
+                                "publish_time": f"{row.get('发布日期', '')} {row.get('发布时间', '')}",
+                                "source": "Cailianshe"
+                            })
+                except Exception as e2:
+                    print(f"Fallback source also failed: {e2}")
+        else:
+            # US Share: yfinance
+            print(f"Fetching US share news for {ticker}...")
+            stock = yf.Ticker(ticker)
+            news = stock.news
+            stock_name = ticker
+            
+            # Take top 10
+            for item in news[:10]:
+                news_items.append({
+                    "title": item.get('title', ''),
+                    "summary": item.get('publisher', '') + ": " + item.get('title', ''), # yf news often has no content body in simple call
+                    "publish_time": str(datetime.datetime.fromtimestamp(item.get('providerPublishTime', 0))) if item.get('providerPublishTime') else '',
+                    "source": item.get('publisher', 'Yahoo Finance')
+                })
+                
+    except Exception as e:
+        return f"Error fetching news: {str(e)}"
+
+    if not news_items:
+        return {
+            "ticker": ticker,
+            "sentiment_score": 0.5,
+            "sentiment_distribution": {"neutral": 1.0},
+            "news_analysis": {"total_news_analyzed": 0, "note": "No recent news found."}
+        }
+
+    # 2. Analyze with LLM
+    print(f"Analyzing {len(news_items)} news items with LLM...")
     
-    return sentiment_data
+    # Load env vars
+    api_key = os.getenv("api_key")
+    api_base = os.getenv("api_base")
+    
+    if not api_key:
+        return "Error: api_key not found in .env"
+        
+    llm = ChatOpenAI(
+        model="deepseek-chat", # DeepSeek model name
+        temperature=0,
+        api_key=api_key,
+        base_url=api_base
+    )
+    
+    news_text = json.dumps(news_items, ensure_ascii=False, indent=2)
+    
+    system_prompt = """You are a financial sentiment analyst. Analyze the following news items for a specific stock.
+    (Note: The user wants to use Chinese for the final report if the input is Chinese, but the component structure should be English keys)
+    
+    Output a JSON object with:
+    - sentiment_score (float -1.0 to 1.0, where >0 is positive, <0 is negative)
+    - sentiment_distribution (positive, neutral, negative probabilities summing to 1.0)
+    - summary_analysis (brief explanation of the driving factors, in Chinese)
+    - key_drivers (list of strings, max 5 items, in Chinese)
+    
+    Focus on the impact on the stock price in the short to medium term.
+    """
+    
+    user_prompt = f"Stock: {stock_name}\n\nNews Items:\n{news_text}"
+    
+    try:
+        response = llm.invoke([
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=user_prompt)
+        ])
+        
+        # Parse output (handling potential code blocks)
+        content = response.content.strip()
+        if "```json" in content:
+            content = content.split("```json")[1].split("```")[0].strip()
+        elif "```" in content:
+            content = content.split("```")[1].strip()
+            
+        analysis_result = json.loads(content)
+        
+        # Combine with metadata
+        final_result = {
+            "ticker": ticker,
+            "sentiment_score": analysis_result.get("sentiment_score", 0),
+            "sentiment_distribution": analysis_result.get("sentiment_distribution", {}),
+            "key_drivers": analysis_result.get("key_drivers", []),
+            "summary_analysis": analysis_result.get("summary_analysis", ""),
+            "news_analysis": {
+                "total_news_analyzed": len(news_items),
+                "top_news": news_items[:3] # Return top 3 for context
+            }
+        }
+        
+        return final_result
+        
+    except Exception as e:
+        return f"Error in LLM analysis: {str(e)}"
 
 if __name__ == "__main__":
-    # 测试用例
-    ticker = "AAPL"
-    result = analyze_sentiment(ticker)
-    print(result)
+    # Test
+    print(analyze_sentiment("600519"))

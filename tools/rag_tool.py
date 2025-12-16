@@ -2,7 +2,7 @@ import os
 from langchain_core.tools import tool
 from langchain_community.document_loaders import PyPDFLoader, DirectoryLoader
 from langchain_community.vectorstores import Chroma
-from langchain_openai import OpenAIEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 # 路径配置
@@ -14,9 +14,15 @@ os.makedirs(DB_PATH, exist_ok=True)
 os.makedirs(DATA_PATH, exist_ok=True)
 
 # 初始化 Embeddings
-# 注意：这需要 OPENAI_API_KEY
+# 使用 HuggingFaceEmbeddings (Running locally, no API key needed)
+# 使用支持中文的多语言模型
 def get_vectorstore():
-    embedding_func = OpenAIEmbeddings()
+    # model_name = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+    # Or smaller one: all-MiniLM-L6-v2 (might perform worse on Chinese)
+    # Let's use a standard one.
+    model_name = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+    
+    embedding_func = HuggingFaceEmbeddings(model_name=model_name)
     
     # 检查向量库是否已经有数据，这里做一个简单的逻辑
     # 实际生产中应该单独运行一个 ingestion 脚本
