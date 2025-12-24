@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import yfinance as yf
 import tushare as ts
 import akshare as ak
@@ -13,7 +14,7 @@ load_dotenv()
 TS_TOKEN = os.getenv("TS_TOKEN", "your_tushare_token_here")
 ts.set_token(TS_TOKEN)
 
-proxy = 'http://127.0.0.1:7897' # 代理设置，此处修改
+proxy = 'http://127.0.0.1:7890' # 代理设置，此处修改
 os.environ['HTTP_PROXY'] = proxy
 os.environ['HTTPS_PROXY'] = proxy
 
@@ -249,14 +250,30 @@ def get_stock_price(ticker: str, market: str = None):
     os.makedirs(cache_dir, exist_ok=True)
     
     result = None
-    # 根据市场参数或股票代码后缀自动选择数据源
-    if market == 'cn' or (market is None and any(ticker.endswith(suffix) for suffix in ['SH', 'SZ', 'BJ'])):
-        try:
-            result = get_tushare_stock_data(ticker)
-        except Exception as e:
-            print(f"🔄 Tushare获取失败，尝试使用Akshare: {e}")
-            result = get_akshare_stock_data(ticker)
-    elif market == 'us' or (market is None and not any(ticker.endswith(suffix) for suffix in ['SH', 'SZ', 'BJ'])):
+    # Detect market type roughly
+    is_a_share = any(ticker.endswith(suffix) for suffix in ['.SH', '.SZ', '.BJ']) or (ticker.isdigit() and len(ticker) == 6)
+    
+    # 根据市场参数或股票代码判断
+    if market == 'cn' or (market is None and is_a_share):
+        # For A-shares, if suffix is missing, try to add it or use Akshare directly
+        if not any(ticker.endswith(suffix) for suffix in ['.SH', '.SZ', '.BJ']) and ticker.isdigit() and len(ticker) == 6:
+            # 6-digit without suffix
+            try:
+                # Try Tushare with .SH first, then .SZ
+                try:
+                    result = get_tushare_stock_data(f"{ticker}.SH")
+                except:
+                    result = get_tushare_stock_data(f"{ticker}.SZ")
+            except:
+                print(f"🔄 Tushare suffix prediction failed, using Akshare for {ticker}")
+                result = get_akshare_stock_data(ticker)
+        else:
+            try:
+                result = get_tushare_stock_data(ticker)
+            except Exception as e:
+                print(f"🔄 Tushare获取失败，尝试使用Akshare: {e}")
+                result = get_akshare_stock_data(ticker)
+    elif market == 'us' or (market is None and not is_a_share):
         result = get_yfinance_stock_data(ticker)
     else:
         result = get_yfinance_stock_data(ticker)

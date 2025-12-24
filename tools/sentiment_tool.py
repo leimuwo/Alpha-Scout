@@ -1,10 +1,9 @@
-from langchain_core.tools import tool
+# -*- coding: utf-8 -*-
 from utils.error_handlers import tool_error_handler
 import os
 import akshare as ak
 import yfinance as yf
-from langchain_openai import ChatOpenAI
-from langchain_core.messages import HumanMessage, SystemMessage
+from openai import OpenAI
 import json
 import datetime
 from dotenv import load_dotenv
@@ -13,11 +12,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Proxy settings (consistent with other tools)
-proxy = 'http://127.0.0.1:7897'
+proxy = 'http://127.0.0.1:7890'
 os.environ['HTTP_PROXY'] = proxy
 os.environ['HTTPS_PROXY'] = proxy
 
-@tool
 @tool_error_handler
 def analyze_sentiment(ticker: str):
     """
@@ -49,21 +47,17 @@ def analyze_sentiment(ticker: str):
                     recent_news = news_df.head(10)
                     for _, row in recent_news.iterrows():
                         news_items.append({
-                            "title": row.get('title', ''),
-                            "summary": row.get('content', '')[:200] + "...", # Truncate content
-                            "publish_time": row.get('public_time', ''),
-                            "source": "EastMoney"
+                            "title": row.get('新闻标题', ''),
+                            "summary": (row.get('新闻内容', '') or '')[:200] + "...", 
+                            "publish_time": row.get('发布时间', ''),
+                            "source": row.get('文章来源', 'EastMoney')
                         })
             except Exception as e:
                 print(f"Warning: Primary news source failed ({e}). Trying fallback (Cailianshe)...")
                 # Fallback: Cailianshe Global Rolling News filtered by stock code/name
                 try:
                     news_df = ak.stock_info_global_cls()
-                    # Filter for code or name (if we had name, but code is safer alias)
-                    # We don't have name easily here without another call, so just filter by code or simple heuristic
                     mask = news_df['内容'].str.contains(code) | news_df['标题'].str.contains(code)
-                    # If we could get stock name that would be better. 
-                    # Let's try to search fast.
                     filtered_news = news_df[mask]
                     
                     if not filtered_news.empty:
@@ -113,9 +107,7 @@ def analyze_sentiment(ticker: str):
     if not api_key:
         return "Error: api_key not found in .env"
         
-    llm = ChatOpenAI(
-        model="deepseek-chat", # DeepSeek model name
-        temperature=0,
+    client = OpenAI(
         api_key=api_key,
         base_url=api_base
     )
@@ -137,13 +129,17 @@ def analyze_sentiment(ticker: str):
     user_prompt = f"Stock: {stock_name}\n\nNews Items:\n{news_text}"
     
     try:
-        response = llm.invoke([
-            SystemMessage(content=system_prompt),
-            HumanMessage(content=user_prompt)
-        ])
+        response = client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=0
+        )
         
         # Parse output (handling potential code blocks)
-        content = response.content.strip()
+        content = response.choices[0].message.content.strip()
         if "```json" in content:
             content = content.split("```json")[1].split("```")[0].strip()
         elif "```" in content:

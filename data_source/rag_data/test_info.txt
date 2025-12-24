@@ -1,0 +1,4 @@
+Alpha Scout 2.0 release date is set for December 2025.
+The new version features advanced portfolio analysis and strategy backtesting.
+The core engine uses DeepSeek models for intelligence.
+This is a confidential text file for RAG testing.

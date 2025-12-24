@@ -1,9 +1,5 @@
-langgraph
 openai
 python-dotenv
-langchain-core
-langchain-openai
-langchain-community
 tushare
 akshare
 pandas
@@ -12,4 +8,3 @@ matplotlib
 pypdf
 chromadb
 sentence-transformers
-langchain-huggingface

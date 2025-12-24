@@ -1,7 +1,9 @@
-from typing import Annotated, Sequence, TypedDict, Union
-from langchain_core.messages import BaseMessage
-import operator
+from typing import List, Dict, Any, TypedDict
 
 class AgentState(TypedDict):
-    # messages 存储对话历史，operator.add 表示新消息会追加到列表中而不是覆盖
-    messages: Annotated[Sequence[BaseMessage], operator.add]
+    """
+    State for the Alpha Scout Agent.
+    messages: A list of message dictionaries in OpenAI format:
+              {"role": "user" | "assistant" | "system" | "tool", "content": str, "tool_calls": Optional[List], "tool_call_id": Optional[str]}
+    """
+    messages: List[Dict[str, Any]]

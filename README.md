@@ -9,8 +9,8 @@ Alpha Scout 是一个功能强大的智能股票分析系统，提供全面的�
 - [x] 优化股票图表工具，支持更多技术指标
 - [x] 优化股票信息源，目前支持yfinance，tushare, akshare
 - [ ] 开发Web用户界面 (Streamlit/Web)
-- [ ] 实现投资组合管理 (优化配置与风险评估)
-- [ ] 添加回测模块 (策略验证)
+- [x] 实现投资组合管理 (优化配置与风险评估)
+- [x] 添加回测模块 (策略验证)
 - [ ] 升级RAG功能 (支持网页搜索与多种文档格式)
 
 ## 🌟 核心功能
@@ -24,7 +24,7 @@ Alpha Scout 是一个功能强大的智能股票分析系统，提供全面的�
 - 公司概况：名称、行业、市盈率、市值等
 - 财务报表分析：利润表、资产负债表和现金流量表
 - 估值指标：PE、PB、PS、PEG等
-- **RAG增强检索**：基于LangChain和ChromaDB，支持从本地财报PDF中检索关键信息 (Multi-lingual Embedding)
+- **RAG增强检索**：基于 ChromaDB，支持从本地财报PDF中检索关键信息 (Multi-lingual Embedding)
 
 ### 3. 技术分析
 - 历史数据可视化：支持1月/3月/6月/1年等多种周期
@@ -93,7 +93,7 @@ HTTPS_PROXY=http://127.0.0.1:7897
 ```
 Alpha Scout/
 ├── core/              # 核心功能模块
-│   ├── agent_graph.py      # 智能代理图
+│   ├── agent.py            # 智能代理逻辑 (Custom Tool-calling Loop)
 │   ├── agent_state.py      # 代理状态管理
 │   └── prompt_templates.py # 提示模板
 ├── data_source/       # 数据来源相关

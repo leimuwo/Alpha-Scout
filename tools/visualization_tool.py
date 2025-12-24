@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import yfinance as yf
 import matplotlib
 # 使用非交互式后端，避免Tkinter相关错误
@@ -5,10 +6,8 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import os
 import pandas as pd
-from langchain_core.tools import tool
 from utils.error_handlers import tool_error_handler
 
-@tool
 @tool_error_handler
 def plot_stock_history(ticker: str, period: str = "1mo"):
     """

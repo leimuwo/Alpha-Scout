@@ -1,4 +1,5 @@
 
+# -*- coding: utf-8 -*-
 import os
 import sys
 # Add project root to sys.path
